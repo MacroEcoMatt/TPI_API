@@ -1,5 +1,5 @@
 #' ---
-#' step 4: Extract Temperature and Aridity limits
+#' Extract Temperature and Aridity limits
 #' Matthew Watson
 #' This code will extract monthly Thermal limits using worldclim data and IUCN range maps
 #' Additionally a yearly average upper and lower limit will be calculated
@@ -10,8 +10,8 @@ library(terra)
 library(progress)
 library(dplyr)
 
-####TPI for mammals #####
-## change sp_list to the file location with the target species range maps
+####TPI for mammals is shown below #####
+## change sp_list to the file location with the target species range maps for amphibians or reptiles
 
 sp_list <- list.files("C:/Coding Files/Species Maps", pattern = "\\.shp$", full.names = T)
 
@@ -69,7 +69,7 @@ for(i in 1:length(mnth)){
 }
 
 ## Save file ordered by species
-
+# change file name to reflect taxonomic group (mammals, reptiles, amphibians)
 DF_ordered <- DF[with(DF, order(Binomial, Month)), ]
 write.csv(DF, "D:/Matt/Thesis Files/Universal Maps and Files/Min and Max Temp Limits/Baseline_TPI_Temperautre_Limits_Mammals.csv")
 
@@ -81,7 +81,7 @@ ag <- aggregate(DF_ordered[, 2:3], list(DF_ordered$Binomial), mean)
 ag<- ag %>% mutate(Month="NONE")%>% rename(Binomial = Group.1)
 final <- rbind(DF_ordered,ag)
 final <- final[with(final, order(Binomial, Month)),]
-
+# change file name to reflect taxonomic group (mammals, reptiles, amphibians)
 write.csv(final, "D:/Matt/Thesis Files/Universal Maps and Files/Min and Max Temp Limits/Baseline_TPI_Temperautre_Limits_Mammals_with_Average.csv")
 
 #####TPI for BIRDS#####
@@ -345,7 +345,7 @@ for(i in 1:length(m)){
   }
   rm(pbsp)
 }
-
+# change file name to reflect taxonomic group (mammals, reptiles, amphibians)
 DF_ordered <- DF[with(DF, order(Binomial, Month)), ]
 write.csv(DF, "C:/Users/matth/OneDrive/Documents/PhD/Thesis/TPI and API/Updated AI with 95% ci to reduce 100s/Jan_Mammals.csv")
 DF_ordered$TMin <- as.numeric(DF_ordered$TMin)
@@ -355,104 +355,8 @@ ag <- aggregate(DF_ordered[, 2:3], list(DF_ordered$Binomial), mean)
 ag<- ag %>% mutate(Month="NONE")%>% rename(Binomial = Group.1)
 final <- rbind(DF_ordered,ag)
 final <- final[with(final, order(Binomial, Month)),]
-
+# change file name to reflect taxonomic group (mammals, reptiles, amphibians)
 write.csv(final, "D:/Matt/Thesis Files/Universal Maps and Files/Min and Max Temp Limits/Baseline_TPI_Temperautre_Limits_Mammals_with_Average.csv")
-
-
-###Reptiles###
-sp_listr <- list.files("E:/Coding Files/Range Maps/Reptiles/All Species", 
-                      pattern = "\\.shp$", full.names = T)
-
-DFR <- data.frame(Binomial= character(),
-                 AMin = numeric(),
-                 AMax = numeric(),
-                 Month = character())
-
-arid_path <- "E:/Coding Files/Climate Data/Environmental Maps/Baseline/"
-
-m <- list("Jan", "Feb", "Mar", "Apr", "May", "June","July", "Aug", "Sep","Oct", "Nov", "Dec")
-
-for(i in 1:length(m)){
-  rast_arid <- rast(list.files(arid_path, pattern = m[[i]], full.names = T))
-  pbsp <- progress_bar$new(format = "(:spin) [:bar] :percent [Elapsed time: :elapsedfull || Estimated time remaining: :eta]",
-                           total = length(sp_list),
-                           complete = "=",   # Completion bar character
-                           incomplete = "-", # Incomplete bar character
-                           current = ">",    # Current bar character
-                           clear = FALSE,    # If TRUE, clears the bar when finish
-                           width = 100)
-  for (sp in sp_listr){
-    pbsp$tick()
-    
-    polyg <- vect(sp)
-    quant <- crop(rast_arid, polyg)
-    quant <- mask(rast_arid, polyg)
-    
-    lower_q <- sapply((global(quant, quantile, probs=c(0.25), na.rm=T)),as.numeric)
-    upper_q <- sapply((global(quant, quantile, probs=c(0.75), na.rm=T)),as.numeric)
-    
-    if (ncol(lower_q) < 2){
-      lower_q <- min(lower_q)
-    } else {
-      lower_q <- min(apply(lower_q, 1, min, na.rm=TRUE))
-    }
-    
-    if (ncol(upper_q) < 2){
-      upper_q <- max(upper_q)
-    } else {
-      upper_q <- max(apply(upper_q, 1, max, na.rm=TRUE))
-    }
-    
-    IQRr <- as.data.frame(extract(rast_arid, polyg, fun=IQR, na.rm=T))[,-1]
-    IQRr <- t(IQRr[is.finite(rowSums(IQRr)),])
-    if (ncol(IQRr) < 2){
-      IQRr <- max(IQRr)
-    } else {
-      IQRr <- max(apply(IQRr, 1, max, na.rm=TRUE))
-    }
-    
-    
-    maxair <- as.data.frame(extract(rast_arid, polyg, fun=max, na.rm=T))[,-1]
-    maxair <- t(maxair[is.finite(rowSums(maxair)),])
-    maxair[maxair > (upper_q + (1.5*IQRr))] <- (upper_q + (1.5*IQRr))
-    if (ncol(maxair) < 2){
-      maxair <- mean(maxair)
-    } else {
-      maxair <- mean(apply(maxair, 1, max, na.rm=TRUE))
-    }
-    
-    
-    minair <- as.data.frame(extract(rast_arid, polyg, fun=min, na.rm=T))[,-1]
-    minair <- t(minair[is.finite(rowSums(minair)),])
-    minair[minair < (lower_q - (1.5*IQRr))] <- (lower_q - (1.5*IQRr))
-    if (ncol(minair) < 2){
-      minair <- mean(minair)
-    } else {
-      minair <- mean(apply(minair, 1, min, na.rm=TRUE))
-    }
-    
-    allspecies <- basename(sp)
-    sp_sub <- sub("_", " ", allspecies)
-    bn <- sub(".shp", "", sp_sub) 
-    DFR[nrow(DFR)+1,] = c(bn,minair,maxair,m[[i]])
-    rm(polyg, quant, minair, maxair,IQRr, lower_q, upper_q, allspecies, sp_sub, bn)
-    gc()
-  }
-  rm(pbsp)
-}
-
-DF_orderedr <- DFR[with(DFR, order(Binomial)), ]
-write.csv(DF_orderedr, "C:/Users/matth/OneDrive/Documents/PhD/Thesis/TPI and API/Updated AI with 95% ci to reduce 100s/Jan_Mammals.csv")
-DF_orderedr$AMin <- as.numeric(DF_orderedr$AMin)
-DF_orderedr$AMax <- as.numeric(DF_orderedr$AMax)
-
-ag <- aggregate(DF_orderedr[, 2:3], list(DF_orderedr$Binomial), mean)
-ag<- ag %>% mutate(Month="NONE")%>% rename(Binomial = Group.1)
-final <- rbind(DF_orderedr,ag)
-final <- final[with(final, order(Binomial)),]
-
-write.csv(final, "D:/Matt/Thesis Files/Universal Maps and Files/Min and Max Temp Limits/Baseline_TPI_Temperautre_Limits_Mammals_with_Average.csv")
-
 
 ###Birds North###
 
